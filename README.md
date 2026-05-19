@@ -38,8 +38,8 @@
 
 ```bash
 # 克隆仓库
-git clone https://github.com/你的用户名/xieshi-wechat-multi.git
-cd xieshi-wechat-multi
+git clone https://github.com/le-2025/weixindk.git
+cd weixindk
 
 # 安装前端依赖
 pnpm install
@@ -54,7 +54,7 @@ pnpm tauri build
 ## 项目结构
 
 ```
-xieshi-wechat-multi/
+weixindk/
 ├── src/                        # 前端源码
 │   ├── components/
 │   │   ├── About/              # 关于页面
@@ -82,15 +82,8 @@ xieshi-wechat-multi/
 3. 使用本工具产生的任何直接或间接损失，作者不承担任何责任。
 4. 微信是腾讯公司的注册商标，本工具与腾讯公司无任何关联。
 
-## 作者
-
-- **作者**: aaaa
-- **主页**: [www.xieshi.中国](http://www.xieshi.中国)
-- **QQ**: 229458084
-- **微信**: Red---eyes
+> 更多信息请查看应用内的「关于」页面。
 
 ## 许可证
 
 [MIT License](LICENSE)
-
-Copyright (c) 2025 aaaa
