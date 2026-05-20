@@ -46,6 +46,22 @@ export function useWechat() {
     await refreshInstances();
   }, [refreshInstances]);
 
+  const relaunchInstance = useCallback(async (instanceId: string) => {
+    setLoading(true);
+    try {
+      const result = await tauriApi.relaunchWechat(instanceId);
+      await refreshInstances();
+      return result;
+    } finally {
+      setLoading(false);
+    }
+  }, [refreshInstances]);
+
+  const deleteInstance = useCallback(async (instanceId: string) => {
+    await tauriApi.deleteInstance(instanceId);
+    await refreshInstances();
+  }, [refreshInstances]);
+
   useEffect(() => {
     refreshInstances();
     const unlisten = listen("wechat-process-exited", () => {
@@ -56,6 +72,6 @@ export function useWechat() {
 
   return {
     instances, loading,
-    launchNewInstance, refreshInstances, syncInstances, updateLabel, terminateInstance,
+    launchNewInstance, refreshInstances, syncInstances, updateLabel, terminateInstance, relaunchInstance, deleteInstance,
   };
 }

@@ -1,6 +1,6 @@
 [package]
 name = "xieshi-wechat-multi"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 authors = ["aaaa"]
 description = "械式微信多开器 - 免费的微信多开工具"

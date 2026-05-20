@@ -29,11 +29,6 @@ pub fn start_process_monitor(app_handle: AppHandle) {
                                 }
                             }
                         }
-                        if let Ok(count) = db.delete_stopped_instances() {
-                            if count > 0 {
-                                log::info!("[monitor] 自动清空了 {} 个已停止的实例记录", count);
-                            }
-                        }
                     }
                     let _ = app_handle.emit("wechat-process-exited", ());
                 }

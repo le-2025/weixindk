@@ -7,13 +7,15 @@ import {
   CloseOutlined,
   ThunderboltOutlined,
   StopOutlined,
+  PlayCircleOutlined,
+  DeleteOutlined,
   DesktopOutlined,
 } from "@ant-design/icons";
 import { useEffect, useState } from "react";
 import { useWechat } from "../../hooks/useWechat";
 
 export function ControlPanel() {
-  const { instances, loading, launchNewInstance, refreshInstances, syncInstances, updateLabel, terminateInstance } = useWechat();
+  const { instances, loading, launchNewInstance, refreshInstances, syncInstances, updateLabel, terminateInstance, relaunchInstance, deleteInstance } = useWechat();
   const [launchLabel, setLaunchLabel] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState("");
@@ -27,6 +29,15 @@ export function ControlPanel() {
       await launchNewInstance(label);
       message.success("微信启动成功");
       setLaunchLabel("");
+    } catch (err) {
+      message.error(`启动失败: ${err}`);
+    }
+  };
+
+  const handleRelaunch = async (instanceId: string) => {
+    try {
+      await relaunchInstance(instanceId);
+      message.success("微信启动成功");
     } catch (err) {
       message.error(`启动失败: ${err}`);
     }
@@ -60,6 +71,25 @@ export function ControlPanel() {
     });
   };
 
+  const handleDelete = (id: string, label: string) => {
+    Modal.confirm({
+      title: "确认删除实例",
+      content: `确定要删除「${label}」吗？该实例的登录记录将被清除。`,
+      okText: "删除",
+      okType: "danger",
+      cancelText: "取消",
+      centered: true,
+      onOk: async () => {
+        try {
+          await deleteInstance(id);
+          message.success("实例已删除");
+        } catch (err) {
+          message.error(`删除失败: ${err}`);
+        }
+      },
+    });
+  };
+
   const startEdit = (id: string, currentLabel: string) => {
     setEditingId(id);
     setEditLabel(currentLabel);
@@ -81,9 +111,9 @@ export function ControlPanel() {
   };
 
   const runningInstances = instances.filter((i) => i.status === "running");
-  const hasRunning = runningInstances.length > 0;
+  const hasAnyInstances = instances.length > 0;
 
-  if (!hasRunning) {
+  if (!hasAnyInstances) {
     return (
       <div className="flex flex-col items-center justify-center" style={{ minHeight: "calc(100vh - 48px)" }}>
         <div className="animate-fade-in-up flex flex-col items-center">
@@ -166,12 +196,12 @@ export function ControlPanel() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 style={{ fontSize: 22, fontWeight: 700, color: "var(--color-text-primary)", marginBottom: 4 }}>
-            运行中的实例
+            所有实例
           </h2>
-          <div className="flex items-center gap-2">
-            <span className="status-dot status-dot-running" />
+          <div className="flex items-center gap-3">
             <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>
-              {runningInstances.length} 个实例正在运行
+              共 {instances.length} 个
+              {runningInstances.length > 0 && ` · ${runningInstances.length} 个运行中`}
             </span>
           </div>
         </div>
@@ -211,105 +241,148 @@ export function ControlPanel() {
       </div>
 
       <div className="flex flex-col gap-3">
-        {runningInstances.map((item, index) => (
-          <div
-            key={item.id}
-            className="instance-card animate-fade-in-up"
-            style={{ animationDelay: `${index * 60}ms`, animationFillMode: "both" }}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3 flex-1 min-w-0">
-                <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                  style={{
-                    background: "linear-gradient(135deg, rgba(7, 193, 96, 0.1) 0%, rgba(5, 163, 78, 0.15) 100%)",
-                    border: "1px solid rgba(7, 193, 96, 0.15)",
-                  }}
-                >
-                  <DesktopOutlined style={{ color: "#07c160", fontSize: 18 }} />
-                </div>
+        {instances.map((item, index) => {
+          const isRunning = item.status === "running";
+          return (
+            <div
+              key={item.id}
+              className="instance-card animate-fade-in-up"
+              style={{ animationDelay: `${index * 60}ms`, animationFillMode: "both" }}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div
+                    className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                    style={{
+                      background: isRunning
+                        ? "linear-gradient(135deg, rgba(7, 193, 96, 0.1) 0%, rgba(5, 163, 78, 0.15) 100%)"
+                        : "linear-gradient(135deg, rgba(148, 163, 184, 0.1) 0%, rgba(100, 116, 139, 0.1) 100%)",
+                      border: isRunning
+                        ? "1px solid rgba(7, 193, 96, 0.15)"
+                        : "1px solid rgba(148, 163, 184, 0.15)",
+                    }}
+                  >
+                    <DesktopOutlined
+                      style={{
+                        color: isRunning ? "#07c160" : "#94a3b8",
+                        fontSize: 18,
+                      }}
+                    />
+                  </div>
 
-                <div className="flex-1 min-w-0">
-                  {editingId === item.id ? (
-                    <div className="flex items-center gap-2">
-                      <Input
-                        value={editLabel}
-                        onChange={(e) => setEditLabel(e.target.value)}
-                        onPressEnter={saveEdit}
-                        size="small"
-                        style={{ width: 160, borderRadius: 8 }}
-                        autoFocus
-                      />
-                      <Button
-                        size="small"
-                        type="text"
-                        icon={<CheckOutlined />}
-                        onClick={saveEdit}
-                        style={{ color: "#07c160" }}
-                      />
-                      <Button
-                        size="small"
-                        type="text"
-                        icon={<CloseOutlined />}
-                        onClick={cancelEdit}
-                        style={{ color: "#999" }}
-                      />
-                    </div>
-                  ) : (
-                    <div
-                      className="flex items-center gap-2 cursor-pointer group"
-                      onClick={() => startEdit(item.id, item.label)}
-                    >
-                      <span
-                        className="font-semibold text-sm truncate"
-                        style={{ color: "var(--color-text-primary)" }}
+                  <div className="flex-1 min-w-0">
+                    {editingId === item.id ? (
+                      <div className="flex items-center gap-2">
+                        <Input
+                          value={editLabel}
+                          onChange={(e) => setEditLabel(e.target.value)}
+                          onPressEnter={saveEdit}
+                          size="small"
+                          style={{ width: 160, borderRadius: 8 }}
+                          autoFocus
+                        />
+                        <Button
+                          size="small"
+                          type="text"
+                          icon={<CheckOutlined />}
+                          onClick={saveEdit}
+                          style={{ color: "#07c160" }}
+                        />
+                        <Button
+                          size="small"
+                          type="text"
+                          icon={<CloseOutlined />}
+                          onClick={cancelEdit}
+                          style={{ color: "#999" }}
+                        />
+                      </div>
+                    ) : (
+                      <div
+                        className="flex items-center gap-2 cursor-pointer group"
+                        onClick={() => startEdit(item.id, item.label)}
                       >
-                        {item.label}
+                        <span
+                          className="font-semibold text-sm truncate"
+                          style={{ color: "var(--color-text-primary)" }}
+                        >
+                          {item.label}
+                        </span>
+                        <EditOutlined
+                          className="opacity-0 group-hover:opacity-100 transition-opacity"
+                          style={{ color: "#bbb", fontSize: 12 }}
+                        />
+                      </div>
+                    )}
+                    <div className="flex items-center gap-3 mt-1">
+                      {isRunning && (
+                        <span style={{ color: "var(--color-text-secondary)", fontSize: 12 }}>
+                          PID: {item.pid}
+                        </span>
+                      )}
+                      <span style={{ color: "var(--color-text-secondary)", fontSize: 12 }}>
+                        {new Date(item.created_at).toLocaleTimeString("zh-CN", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
                       </span>
-                      <EditOutlined
-                        className="opacity-0 group-hover:opacity-100 transition-opacity"
-                        style={{ color: "#bbb", fontSize: 12 }}
-                      />
                     </div>
-                  )}
-                  <div className="flex items-center gap-3 mt-1">
-                    <span style={{ color: "var(--color-text-secondary)", fontSize: 12 }}>
-                      PID: {item.pid}
-                    </span>
-                    <span style={{ color: "var(--color-text-secondary)", fontSize: 12 }}>
-                      {new Date(item.created_at).toLocaleTimeString("zh-CN", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </span>
                   </div>
                 </div>
-              </div>
 
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <div
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg"
-                  style={{
-                    background: "rgba(7, 193, 96, 0.08)",
-                    border: "1px solid rgba(7, 193, 96, 0.12)",
-                  }}
-                >
-                  <span className="status-dot status-dot-running" style={{ width: 6, height: 6 }} />
-                  <span style={{ color: "#07c160", fontSize: 12, fontWeight: 500 }}>运行中</span>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {isRunning ? (
+                    <>
+                      <div
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg"
+                        style={{
+                          background: "rgba(7, 193, 96, 0.08)",
+                          border: "1px solid rgba(7, 193, 96, 0.12)",
+                        }}
+                      >
+                        <span className="status-dot status-dot-running" style={{ width: 6, height: 6 }} />
+                        <span style={{ color: "#07c160", fontSize: 12, fontWeight: 500 }}>运行中</span>
+                      </div>
+                      <Button
+                        danger
+                        size="small"
+                        icon={<StopOutlined />}
+                        onClick={() => handleTerminate(item.id, item.label)}
+                        style={{ borderRadius: 8, fontWeight: 500 }}
+                      >
+                        终止
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button
+                        type="primary"
+                        size="small"
+                        icon={<PlayCircleOutlined />}
+                        onClick={() => handleRelaunch(item.id)}
+                        loading={loading}
+                        style={{
+                          borderRadius: 8,
+                          fontWeight: 500,
+                          background: "linear-gradient(135deg, #07c160 0%, #05a34e 100%)",
+                          border: "none",
+                          boxShadow: "0 2px 8px rgba(7, 193, 96, 0.25)",
+                        }}
+                      >
+                        启动
+                      </Button>
+                      <Button
+                        size="small"
+                        icon={<DeleteOutlined />}
+                        onClick={() => handleDelete(item.id, item.label)}
+                        style={{ borderRadius: 8, fontWeight: 500, color: "#94a3b8" }}
+                      />
+                    </>
+                  )}
                 </div>
-                <Button
-                  danger
-                  size="small"
-                  icon={<StopOutlined />}
-                  onClick={() => handleTerminate(item.id, item.label)}
-                  style={{ borderRadius: 8, fontWeight: 500 }}
-                >
-                  终止
-                </Button>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

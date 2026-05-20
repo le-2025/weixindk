@@ -20,6 +20,12 @@ export const tauriApi = {
   syncInstances: () =>
     invoke<InstanceInfo[]>("sync_instances"),
 
+  relaunchWechat: (instanceId: string) =>
+    invoke<LaunchInfo>("relaunch_wechat", { instanceId }),
+
+  deleteInstance: (instanceId: string) =>
+    invoke<void>("delete_instance", { instanceId }),
+
   getAppConfig: () =>
     invoke<Record<string, string>>("get_app_config"),
 

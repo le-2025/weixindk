@@ -38,7 +38,7 @@ const AboutPanel = () => {
               械式微信多开器
             </h3>
             <p style={{ color: "var(--color-text-secondary)", fontSize: 13, marginTop: 2 }}>
-              版本 0.1.0 · 免费开源工具
+              版本 0.2.0 · 免费开源工具
             </p>
           </div>
         </div>

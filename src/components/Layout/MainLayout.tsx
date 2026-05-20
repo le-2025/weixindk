@@ -78,7 +78,7 @@ export function MainLayout() {
             }}
           >
             <div className="text-xs font-medium" style={{ color: "rgba(0, 212, 255, 0.8)" }}>
-              v0.1.0
+              v0.2.0
             </div>
             <div className="text-xs mt-1" style={{ color: "rgba(148, 163, 184, 0.5)" }}>
               Powered by Tauri

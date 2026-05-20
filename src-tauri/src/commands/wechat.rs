@@ -24,6 +24,25 @@ pub async fn update_instance_label(instance_id: String, label: String) -> Result
 #[tauri::command]
 pub async fn terminate_instance(instance_id: String) -> Result<(), String> {
     let db = Database::new()?;
+    let inst = db.get_instance(&instance_id)?
+        .ok_or_else(|| format!("实例 {} 不存在", instance_id))?;
+
+    if inst.status == "running" {
+        let pid = inst.pid as u32;
+        if pid > 0 {
+            #[cfg(target_os = "windows")]
+            {
+                use windows::Win32::System::Threading::{OpenProcess, TerminateProcess, PROCESS_TERMINATE};
+                unsafe {
+                    if let Ok(handle) = OpenProcess(PROCESS_TERMINATE, false, pid) {
+                        let _ = TerminateProcess(handle, 0);
+                        let _ = windows::Win32::Foundation::CloseHandle(handle);
+                    }
+                }
+            }
+        }
+    }
+
     db.terminate_instance(&instance_id)
 }
 
@@ -48,4 +67,23 @@ pub async fn sync_instances() -> Result<Vec<Instance>, String> {
     }
 
     db.get_all_instances()
+}
+
+#[tauri::command]
+pub async fn relaunch_wechat(instance_id: String) -> Result<LaunchInfo, String> {
+    let launcher = WechatLauncher::new()?;
+    launcher.relaunch_instance(&instance_id)
+}
+
+#[tauri::command]
+pub async fn delete_instance(instance_id: String) -> Result<(), String> {
+    let db = Database::new()?;
+    let inst = db.get_instance(&instance_id)?
+        .ok_or_else(|| format!("实例 {} 不存在", instance_id))?;
+
+    if inst.status == "running" {
+        return Err("请先终止实例再删除".into());
+    }
+
+    db.delete_instance(&instance_id)
 }

@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/nicedoc/open-tauri-docs-v2/main/content/docs/reference/configuring-tauri-schema-v2.json",
   "productName": "械式微信多开器",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "identifier": "com.xieshi.wechat-multi",
   "build": {
     "frontendDist": "../dist",
