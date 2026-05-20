@@ -9,16 +9,18 @@ import {
   StopOutlined,
   PlayCircleOutlined,
   DeleteOutlined,
+  SaveOutlined,
   DesktopOutlined,
 } from "@ant-design/icons";
 import { useEffect, useState } from "react";
 import { useWechat } from "../../hooks/useWechat";
 
 export function ControlPanel() {
-  const { instances, loading, launchNewInstance, refreshInstances, syncInstances, updateLabel, terminateInstance, relaunchInstance, deleteInstance } = useWechat();
+  const { instances, loading, launchNewInstance, refreshInstances, syncInstances, updateLabel, terminateInstance, relaunchInstance, deleteInstance, saveLogin } = useWechat();
   const [launchLabel, setLaunchLabel] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState("");
+  const [savingId, setSavingId] = useState<string | null>(null);
 
   useEffect(() => {
     refreshInstances();
@@ -49,6 +51,18 @@ export function ControlPanel() {
       message.success("已刷新状态");
     } catch (err) {
       message.error(`刷新失败: ${err}`);
+    }
+  };
+
+  const handleSaveLogin = async (id: string, label: string) => {
+    setSavingId(id);
+    try {
+      const result = await saveLogin(id);
+      message.success(`已保存「${label}」的登录信息 (${result.wxid})`);
+    } catch (err) {
+      message.error(`保存失败: ${err}`);
+    } finally {
+      setSavingId(null);
     }
   };
 
@@ -243,6 +257,7 @@ export function ControlPanel() {
       <div className="flex flex-col gap-3">
         {instances.map((item, index) => {
           const isRunning = item.status === "running";
+          const hasLogin = item.wxid && item.wxid.length > 0;
           return (
             <div
               key={item.id}
@@ -307,6 +322,19 @@ export function ControlPanel() {
                         >
                           {item.label}
                         </span>
+                        {hasLogin && (
+                          <span
+                            className="px-1.5 py-0.5 rounded text-xs"
+                            style={{
+                              background: "rgba(7, 193, 96, 0.08)",
+                              color: "#07c160",
+                              fontSize: 11,
+                              fontWeight: 500,
+                            }}
+                          >
+                            已保存
+                          </span>
+                        )}
                         <EditOutlined
                           className="opacity-0 group-hover:opacity-100 transition-opacity"
                           style={{ color: "#bbb", fontSize: 12 }}
@@ -317,6 +345,11 @@ export function ControlPanel() {
                       {isRunning && (
                         <span style={{ color: "var(--color-text-secondary)", fontSize: 12 }}>
                           PID: {item.pid}
+                        </span>
+                      )}
+                      {hasLogin && (
+                        <span style={{ color: "var(--color-text-secondary)", fontSize: 12 }}>
+                          {item.wxid}
                         </span>
                       )}
                       <span style={{ color: "var(--color-text-secondary)", fontSize: 12 }}>
@@ -342,6 +375,15 @@ export function ControlPanel() {
                         <span className="status-dot status-dot-running" style={{ width: 6, height: 6 }} />
                         <span style={{ color: "#07c160", fontSize: 12, fontWeight: 500 }}>运行中</span>
                       </div>
+                      <Button
+                        size="small"
+                        icon={<SaveOutlined />}
+                        onClick={() => handleSaveLogin(item.id, item.label)}
+                        loading={savingId === item.id}
+                        style={{ borderRadius: 8, fontWeight: 500, color: "#07c160", borderColor: "rgba(7, 193, 96, 0.3)" }}
+                      >
+                        保存登录
+                      </Button>
                       <Button
                         danger
                         size="small"

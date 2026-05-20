@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { LaunchInfo, InstanceInfo } from "../types";
+import type { LaunchInfo, SaveLoginInfo, InstanceInfo } from "../types";
 
 export const tauriApi = {
   launchWechat: (label?: string) =>
@@ -25,6 +25,9 @@ export const tauriApi = {
 
   deleteInstance: (instanceId: string) =>
     invoke<void>("delete_instance", { instanceId }),
+
+  saveWechatLogin: (instanceId: string) =>
+    invoke<SaveLoginInfo>("save_wechat_login", { instanceId }),
 
   getAppConfig: () =>
     invoke<Record<string, string>>("get_app_config"),

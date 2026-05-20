@@ -100,6 +100,7 @@ pub fn run() {
             wechat::sync_instances,
             wechat::relaunch_wechat,
             wechat::delete_instance,
+            wechat::save_wechat_login,
             config::get_app_config,
             config::save_app_config,
             config::set_minimize_to_tray,

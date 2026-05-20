@@ -9,6 +9,7 @@ pub struct Instance {
     pub hwnd: String,
     pub data_path: String,
     pub status: String,
+    pub wxid: String,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
 }

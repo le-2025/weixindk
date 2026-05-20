@@ -24,6 +24,12 @@ pub struct LaunchInfo {
     pub hwnd: String,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct SaveLoginInfo {
+    pub wxid: String,
+    pub has_avatar: bool,
+}
+
 pub struct WechatLauncher {
     db: Database,
 }
@@ -226,6 +232,8 @@ impl WechatLauncher {
         let wechat_path = self.get_wechat_path()?;
         let data_dir = PathBuf::from(&inst.data_path);
 
+        Self::restore_login(&data_dir)?;
+
         let pid = Self::launch_process(&wechat_path, &data_dir)?;
         let hwnd = format!("0x{:X}", pid);
 
@@ -233,5 +241,186 @@ impl WechatLauncher {
 
         log::info!("[launcher] 实例重新启动成功: id={}, pid={}", instance_id, pid);
         Ok(LaunchInfo { instance_id: instance_id.to_string(), pid, hwnd })
+    }
+
+    pub fn save_login(&self, instance_id: &str) -> Result<SaveLoginInfo, String> {
+        log::info!("========== save_login 开始: {} ==========", instance_id);
+
+        let inst = self.db.get_instance(instance_id)?
+            .ok_or_else(|| format!("实例 {} 不存在", instance_id))?;
+
+        if inst.status != "running" {
+            return Err("只有运行中的实例才能保存登录信息".into());
+        }
+
+        let data_dir = PathBuf::from(&inst.data_path);
+
+        let xwechat_dir = data_dir.join("Documents").join("xwechat_files");
+        let wechat_dir = data_dir.join("Documents").join("WeChat Files");
+
+        let wechat_data_dir = if xwechat_dir.join("all_users").exists() {
+            xwechat_dir
+        } else if wechat_dir.join("all_users").exists() {
+            wechat_dir
+        } else {
+            return Err("未找到微信数据目录，请确认微信已成功登录".into());
+        };
+
+        let login_dir = wechat_data_dir.join("all_users").join("login");
+        if !login_dir.exists() {
+            return Err("微信登录目录不存在，请确认微信已成功登录".into());
+        }
+
+        let wxid = Self::find_latest_wxid(&login_dir)?;
+        if wxid.is_empty() {
+            return Err("未能识别当前登录的微信账号".into());
+        }
+
+        log::info!("[save_login] 识别到 wxid={}", wxid);
+
+        let backup_dir = data_dir.join("login_backup");
+        fs::create_dir_all(&backup_dir)
+            .map_err(|e| format!("创建备份目录失败: {}", e))?;
+
+        let config_dir = wechat_data_dir.join("all_users").join("config");
+        let global_config = config_dir.join("global_config");
+        let global_config_crc = config_dir.join("global_config.crc");
+
+        if global_config.exists() {
+            fs::copy(&global_config, backup_dir.join("global_config"))
+                .map_err(|e| format!("备份global_config失败: {}", e))?;
+        }
+        if global_config_crc.exists() {
+            fs::copy(&global_config_crc, backup_dir.join("global_config.crc"))
+                .map_err(|e| format!("备份global_config.crc失败: {}", e))?;
+        }
+
+        let mut has_avatar = false;
+        let head_imgs_dir = wechat_data_dir.join("all_users").join("head_imgs").join("0");
+        if head_imgs_dir.exists() {
+            if let Some(latest_img) = Self::find_latest_file(&head_imgs_dir) {
+                if let Ok(_) = fs::copy(&latest_img, backup_dir.join("logo.png")) {
+                    has_avatar = true;
+                }
+            }
+        }
+
+        self.db.update_wxid(instance_id, &wxid)?;
+
+        log::info!("[save_login] 保存成功: wxid={}, has_avatar={}", wxid, has_avatar);
+        Ok(SaveLoginInfo { wxid, has_avatar })
+    }
+
+    fn find_latest_wxid(login_dir: &Path) -> Result<String, String> {
+        let entries = fs::read_dir(login_dir)
+            .map_err(|e| format!("读取登录目录失败: {}", e))?;
+
+        let mut latest_time = 0u64;
+        let mut latest_wxid = String::new();
+
+        for entry in entries {
+            let entry = entry.map_err(|e| format!("读取目录项失败: {}", e))?;
+            let path = entry.path();
+            if !path.is_dir() {
+                continue;
+            }
+
+            let shm_file = path.join("key_info.db-shm");
+            if !shm_file.exists() {
+                continue;
+            }
+
+            if let Ok(metadata) = shm_file.metadata() {
+                let modified = metadata.modified()
+                    .map_err(|e| format!("获取文件时间失败: {}", e))?;
+                let millis = modified.duration_since(std::time::UNIX_EPOCH)
+                    .map_err(|e| format!("时间转换失败: {}", e))?
+                    .as_millis() as u64;
+
+                if millis > latest_time {
+                    latest_time = millis;
+                    latest_wxid = path.file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_default();
+                }
+            }
+        }
+
+        Ok(latest_wxid)
+    }
+
+    fn find_latest_file(dir: &Path) -> Option<PathBuf> {
+        let entries = fs::read_dir(dir).ok()?;
+        let mut latest_time = 0u64;
+        let mut latest_path: Option<PathBuf> = None;
+
+        for entry in entries {
+            if let Ok(entry) = entry {
+                let path = entry.path();
+                if !path.is_file() {
+                    continue;
+                }
+                if let Ok(metadata) = path.metadata() {
+                    if let Ok(modified) = metadata.modified() {
+                        if let Ok(millis) = modified.duration_since(std::time::UNIX_EPOCH) {
+                            let ms = millis.as_millis() as u64;
+                            if ms > latest_time {
+                                latest_time = ms;
+                                latest_path = Some(path);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        latest_path
+    }
+
+    fn restore_login(data_dir: &Path) -> Result<(), String> {
+        let backup_dir = data_dir.join("login_backup");
+        let backup_config = backup_dir.join("global_config");
+
+        if !backup_config.exists() {
+            log::info!("[restore_login] 无备份数据，跳过恢复");
+            return Ok(());
+        }
+
+        let xwechat_dir = data_dir.join("Documents").join("xwechat_files");
+        let wechat_dir = data_dir.join("Documents").join("WeChat Files");
+
+        let wechat_data_dir = if xwechat_dir.join("all_users").exists() {
+            xwechat_dir
+        } else if wechat_dir.join("all_users").exists() {
+            wechat_dir
+        } else {
+            return Err("未找到微信数据目录".into());
+        };
+
+        let config_dir = wechat_data_dir.join("all_users").join("config");
+        fs::create_dir_all(&config_dir)
+            .map_err(|e| format!("创建config目录失败: {}", e))?;
+
+        let active_config = config_dir.join("global_config");
+        let active_config_crc = config_dir.join("global_config.crc");
+
+        if active_config.exists() {
+            let _ = fs::remove_file(&active_config);
+        }
+        if active_config_crc.exists() {
+            let _ = fs::remove_file(&active_config_crc);
+        }
+
+        fs::copy(&backup_config, &active_config)
+            .map_err(|e| format!("恢复global_config失败: {}", e))?;
+
+        let backup_crc = backup_dir.join("global_config.crc");
+        if backup_crc.exists() {
+            fs::copy(&backup_crc, &active_config_crc)
+                .map_err(|e| format!("恢复global_config.crc失败: {}", e))?;
+        }
+
+        log::info!("[restore_login] 登录数据恢复成功");
+        Ok(())
     }
 }

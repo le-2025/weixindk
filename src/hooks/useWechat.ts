@@ -62,6 +62,12 @@ export function useWechat() {
     await refreshInstances();
   }, [refreshInstances]);
 
+  const saveLogin = useCallback(async (instanceId: string) => {
+    const result = await tauriApi.saveWechatLogin(instanceId);
+    await refreshInstances();
+    return result;
+  }, [refreshInstances]);
+
   useEffect(() => {
     refreshInstances();
     const unlisten = listen("wechat-process-exited", () => {
@@ -72,6 +78,6 @@ export function useWechat() {
 
   return {
     instances, loading,
-    launchNewInstance, refreshInstances, syncInstances, updateLabel, terminateInstance, relaunchInstance, deleteInstance,
+    launchNewInstance, refreshInstances, syncInstances, updateLabel, terminateInstance, relaunchInstance, deleteInstance, saveLogin,
   };
 }

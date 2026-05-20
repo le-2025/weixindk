@@ -4,6 +4,11 @@ export interface LaunchInfo {
   hwnd: string;
 }
 
+export interface SaveLoginInfo {
+  wxid: string;
+  has_avatar: boolean;
+}
+
 export interface InstanceInfo {
   id: string;
   label: string;
@@ -11,6 +16,7 @@ export interface InstanceInfo {
   hwnd: string;
   data_path: string;
   status: "running" | "stopped";
+  wxid: string;
   created_at: string;
 }
 
