@@ -72,12 +72,6 @@ impl Database {
             ).map_err(|e| format!("迁移 instances.created_at 失败: {}", e))?;
         }
 
-        if !columns.iter().any(|c| c == "wxid") {
-            self.conn.execute_batch(
-                "ALTER TABLE instances ADD COLUMN wxid TEXT DEFAULT '';"
-            ).map_err(|e| format!("迁移 instances.wxid 失败: {}", e))?;
-        }
-
         let config_columns: Vec<String> = self.conn
             .prepare("PRAGMA table_info(app_config)")
             .map_err(|e| format!("查询表结构失败: {}", e))?
@@ -108,7 +102,7 @@ impl Database {
 
     pub fn get_all_instances(&self) -> Result<Vec<Instance>, String> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, label, pid, hwnd, data_path, status, wxid, created_at, updated_at
+            "SELECT id, label, pid, hwnd, data_path, status, created_at, updated_at
              FROM instances ORDER BY created_at DESC"
         ).map_err(|e| format!("准备查询失败: {}", e))?;
 
@@ -120,9 +114,8 @@ impl Database {
                 hwnd: row.get(3)?,
                 data_path: row.get(4)?,
                 status: row.get(5)?,
-                wxid: row.get(6)?,
-                created_at: row.get(7)?,
-                updated_at: row.get(8)?,
+                created_at: row.get(6)?,
+                updated_at: row.get(7)?,
             })
         }).map_err(|e| format!("查询实例失败: {}", e))?;
 
@@ -149,7 +142,7 @@ impl Database {
 
     pub fn get_instance(&self, id: &str) -> Result<Option<Instance>, String> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, label, pid, hwnd, data_path, status, wxid, created_at, updated_at
+            "SELECT id, label, pid, hwnd, data_path, status, created_at, updated_at
              FROM instances WHERE id = ?1"
         ).map_err(|e| format!("准备查询失败: {}", e))?;
 
@@ -161,9 +154,8 @@ impl Database {
                 hwnd: row.get(3)?,
                 data_path: row.get(4)?,
                 status: row.get(5)?,
-                wxid: row.get(6)?,
-                created_at: row.get(7)?,
-                updated_at: row.get(8)?,
+                created_at: row.get(6)?,
+                updated_at: row.get(7)?,
             })
         });
         match result {
@@ -196,14 +188,6 @@ impl Database {
             [],
         ).map_err(|e| format!("删除已停止实例失败: {}", e))?;
         Ok(affected)
-    }
-
-    pub fn update_wxid(&self, id: &str, wxid: &str) -> Result<(), String> {
-        self.conn.execute(
-            "UPDATE instances SET wxid = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2",
-            params![wxid, id],
-        ).map_err(|e| format!("更新wxid失败: {}", e))?;
-        Ok(())
     }
 
     pub fn get_config(&self, key: &str) -> Result<Option<String>, String> {

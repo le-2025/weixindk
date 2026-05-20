@@ -1,4 +1,4 @@
-use crate::process::launcher::{LaunchInfo, SaveLoginInfo, WechatLauncher};
+use crate::process::launcher::{LaunchInfo, WechatLauncher};
 use crate::mutex::manager;
 use crate::storage::database::Database;
 use crate::storage::models::Instance;
@@ -86,11 +86,4 @@ pub async fn delete_instance(instance_id: String) -> Result<(), String> {
     }
 
     db.delete_instance(&instance_id)
-}
-
-#[tauri::command]
-pub async fn save_wechat_login(instance_id: String) -> Result<SaveLoginInfo, String> {
-    let launcher = WechatLauncher::new()?;
-    let result = launcher.save_login(&instance_id)?;
-    Ok(result)
 }
