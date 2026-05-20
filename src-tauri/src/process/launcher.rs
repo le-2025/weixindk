@@ -255,16 +255,10 @@ impl WechatLauncher {
 
         let data_dir = PathBuf::from(&inst.data_path);
 
-        let xwechat_dir = data_dir.join("Documents").join("xwechat_files");
-        let wechat_dir = data_dir.join("Documents").join("WeChat Files");
+        let wechat_data_dir = Self::find_wechat_data_dir(&data_dir)
+            .ok_or_else(|| "未找到微信数据目录。请确认微信已登录，或在设置中配置微信文档路径".to_string())?;
 
-        let wechat_data_dir = if xwechat_dir.join("all_users").exists() {
-            xwechat_dir
-        } else if wechat_dir.join("all_users").exists() {
-            wechat_dir
-        } else {
-            return Err("未找到微信数据目录，请确认微信已成功登录".into());
-        };
+        log::info!("[save_login] 微信数据目录: {:?}", wechat_data_dir);
 
         let login_dir = wechat_data_dir.join("all_users").join("login");
         if !login_dir.exists() {
@@ -309,6 +303,89 @@ impl WechatLauncher {
 
         log::info!("[save_login] 保存成功: wxid={}, has_avatar={}", wxid, has_avatar);
         Ok(SaveLoginInfo { wxid, has_avatar })
+    }
+
+    fn find_wechat_data_dir(instance_data_dir: &Path) -> Option<PathBuf> {
+        let candidates = [
+            instance_data_dir.join("Documents").join("xwechat_files"),
+            instance_data_dir.join("Documents").join("WeChat Files"),
+        ];
+        for dir in &candidates {
+            if dir.join("all_users").exists() {
+                log::info!("[find_wechat_data_dir] 在实例目录找到: {:?}", dir);
+                return Some(dir.clone());
+            }
+        }
+
+        #[cfg(target_os = "windows")]
+        {
+            if let Some(reg_path) = Self::get_reg_wechat_file_path() {
+                let reg_dir = PathBuf::from(&reg_path);
+                if reg_dir.join("all_users").exists() {
+                    log::info!("[find_wechat_data_dir] 在注册表路径找到: {:?}", reg_dir);
+                    return Some(reg_dir);
+                }
+            }
+
+            if let Some(docs) = dirs::document_dir() {
+                let default_dir = docs.join("xwechat_files");
+                if default_dir.join("all_users").exists() {
+                    log::info!("[find_wechat_data_dir] 在默认Documents找到: {:?}", default_dir);
+                    return Some(default_dir);
+                }
+                let old_dir = docs.join("WeChat Files");
+                if old_dir.join("all_users").exists() {
+                    log::info!("[find_wechat_data_dir] 在默认Documents找到(旧版): {:?}", old_dir);
+                    return Some(old_dir);
+                }
+            }
+        }
+
+        None
+    }
+
+    #[cfg(target_os = "windows")]
+    fn get_reg_wechat_file_path() -> Option<String> {
+        use windows::Win32::System::Registry::*;
+        unsafe {
+            for reg_path in &[
+                r"Software\Tencent\Weixin",
+                r"Software\Tencent\WeChat",
+            ] {
+                let mut key = HKEY::default();
+                let wide_path: Vec<u16> = reg_path.encode_utf16().chain(std::iter::once(0)).collect();
+                if RegOpenKeyExW(
+                    HKEY_CURRENT_USER,
+                    windows::core::PCWSTR(wide_path.as_ptr()),
+                    0,
+                    KEY_READ,
+                    &mut key,
+                ).is_ok() {
+                    let mut buf = [0u16; 512];
+                    let mut buf_len: u32 = (buf.len() * 2) as u32;
+                    let wide_name: Vec<u16> = "FileSavePath".encode_utf16().chain(std::iter::once(0)).collect();
+                    if RegQueryValueExW(
+                        key,
+                        windows::core::PCWSTR(wide_name.as_ptr()),
+                        None,
+                        None,
+                        Some(buf.as_mut_ptr() as *mut u8),
+                        Some(&mut buf_len),
+                    ).is_ok() {
+                        let len = buf_len as usize / 2;
+                        if len > 0 && buf[len - 1] == 0 {
+                            let s = String::from_utf16_lossy(&buf[..len - 1]);
+                            if !s.is_empty() && std::path::Path::new(&s).exists() {
+                                let _ = RegCloseKey(key);
+                                return Some(s);
+                            }
+                        }
+                    }
+                    let _ = RegCloseKey(key);
+                }
+            }
+        }
+        None
     }
 
     fn find_latest_wxid(login_dir: &Path) -> Result<String, String> {
@@ -386,16 +463,10 @@ impl WechatLauncher {
             return Ok(());
         }
 
-        let xwechat_dir = data_dir.join("Documents").join("xwechat_files");
-        let wechat_dir = data_dir.join("Documents").join("WeChat Files");
+        let wechat_data_dir = Self::find_wechat_data_dir(data_dir)
+            .ok_or_else(|| "未找到微信数据目录，无法恢复登录状态".to_string())?;
 
-        let wechat_data_dir = if xwechat_dir.join("all_users").exists() {
-            xwechat_dir
-        } else if wechat_dir.join("all_users").exists() {
-            wechat_dir
-        } else {
-            return Err("未找到微信数据目录".into());
-        };
+        log::info!("[restore_login] 微信数据目录: {:?}", wechat_data_dir);
 
         let config_dir = wechat_data_dir.join("all_users").join("config");
         fs::create_dir_all(&config_dir)
